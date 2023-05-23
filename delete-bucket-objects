@@ -1,0 +1,42 @@
+#!/bin/sh
+
+KEEP=${1:-$KEEP}
+CREDENTIALS_PATH=/root/.config/gcloud/application_default_credentials.json
+
+if [ "$BUCKET" = "" ]; then
+  echo "Error : No BUCKET specified"
+  exit 1
+fi
+
+if [ "$PROJECT_ID" = "" ]; then
+  echo "Error : No PROJECT_ID specified"
+  exit 1
+fi
+
+if [ ! -z $CREDENTIALS_KEYFILE ]; then
+  mkdir -p $(dirname $CREDENTIALS_PATH)
+  echo $CREDENTIALS_KEYFILE | base64 -d > $CREDENTIALS_PATH
+fi
+
+if [ -f $CREDENTIALS_PATH ]; then
+  gcloud auth activate-service-account --key-file=$CREDENTIALS_PATH
+fi
+
+OBJECTS=$(gcloud storage --project=$PROJECT_ID ls gs://$BUCKET/)
+COUNT_LINES=$(echo "$OBJECTS" | wc -l)
+LINES=$(($COUNT_LINES - $KEEP))
+
+if [ $LINES -le 0 ]
+then
+  echo "No backup to delete"
+  exit 0
+fi
+
+OBJECTS_DELETE=$(echo "$OBJECTS" | head -n $LINES)
+
+echo "$LINES backups will be deleted:"
+echo "$OBJECTS_DELETE"
+
+echo "$OBJECTS_DELETE" | while read -r OBJECT; do
+  gcloud storage --project=$PROJECT_ID rm $OBJECT
+done
